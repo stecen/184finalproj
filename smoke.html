@@ -90,7 +90,7 @@
       // float vY = 1.0;
       float dY = 0.5*(1.0-pixel.y); //0.2 * cos(32.0  * pixel.y);
       float prevY = pixel.y - FPS_FACTOR * dY;
-      float dX = 0.1 * sin(32.0 * pixel.x);
+      float dX = 0.4*(1.0-pixel.x);//0.1 * sin(32.0 * pixel.x);
       float prevX = pixel.x - FPS_FACTOR * dX;
 
       vec4 prevSmoke = texture2D(densityBufferTexture, vec2(prevX, prevY));
@@ -128,13 +128,13 @@
     // Plane holding all of the graphics
     var canvas;
 
-    // Buffer variables
+    // Buffer variables: Source and Diffusion
     var textureA;
 		var bufferMaterial;
 		var bufferObject;
     var bufferScene;
 
-    // Second buffer
+    // Second buffer: Velocity field
     var textureB;
     var bufferMaterial2;
 		var bufferObject2;
@@ -156,6 +156,8 @@
 			textureB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
       textureC = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
 
+
+      //////// DIFFUSION ////////
 
       // Create buffer scene, which will hold the shader material (bufferMaterial)
 			bufferScene = new THREE.Scene();
@@ -245,7 +247,6 @@
 
       generateSmokeAt(width / 2 + random_x, height / 2 + random_y, 0.1, radius, sourceRedWeight);
 
-      var beforePause = 100;
       // if (!requestStop) {
       setTimeout(pauseSmoke, GEN_SMOKE_TIME);
       // }
@@ -265,6 +266,9 @@
         // 2. Create a texture to store what you render
         // 3. Render your scene onto your texture
 
+
+      // textureA -> source/diffuse shader -> textureB -> velocity shader -> textureC -> Screen
+
        // Assume that textureA thru the shader (thru bufferMaterial)
 		   // Now, move bufferscene objects (result of passing A through shader) --> textureB
 		  renderer.render(bufferScene, camera, textureB, true); // This is the line that maintains the pairing between txtA and txtB
@@ -276,7 +280,7 @@
       // renderer.render(bufferScene2, camera, textureB, true);
 
       // This line applies to any WebGL project; draw to screen
-      // Render texture B to the scene (through finalObject since we just swapped it)
+      // Render texture C to the scene (through finalObject since we just swapped it)
 		  renderer.render(finalScene, camera );
 
 		  var swap = textureA;
