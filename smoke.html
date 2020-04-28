@@ -1,0 +1,306 @@
+<html>
+<head>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.min.js"></script>
+	<style>
+		/* We want our scene to span the entire window */
+		body { margin: 0; }
+	</style>
+</heda>
+<body>
+
+  <script id="diffuseShader" type="shader-code">
+
+		uniform vec2 res; // Screen resolution
+		uniform sampler2D densityBufferTexture;
+    uniform sampler2D previousDensity;
+
+		uniform vec3 smokeSource; // (x_pos, y_pos, "power")
+    uniform float radius;
+    uniform float sourceRedWeight;
+
+		void main() {
+      // Fragcoord and res are both in width x height --> have to convert to 0->1.0 range
+      // Which is the range 'pixel' is within
+      vec2 pixel = gl_FragCoord.xy / res.xy;
+
+      // gl_FragColor is our "return value" for thie pixel
+      gl_FragColor = texture2D(densityBufferTexture, pixel);
+
+      //////////// SOURCE  //////////////////
+
+      // If within the specified radius, add smoke here
+      float dist = distance(smokeSource.xy, gl_FragCoord.xy);
+      float sourceSmokeAmt = smokeSource.z * max(radius - dist, 0.0); // don't go outside radius
+      float finalSourceRed = sourceSmokeAmt;
+      float finalSourceGreen = sourceSmokeAmt;
+      float finalSourceBlue = sourceSmokeAmt;
+      gl_FragColor.r += sourceRedWeight * finalSourceRed;
+      gl_FragColor.g += finalSourceGreen;
+      gl_FragColor.b += finalSourceBlue;
+      // gl_FragColor.r = gl_FragColor.r * sourceRedWeight;
+
+      // Additionally, move smoke over from neighboring pixels and vice versa
+      float xPixelSize = 1.0 / res.x;
+      float yPixelSize = 1.0 / res.y;
+
+      //////////// DIFFUSE  //////////////////
+
+      vec4 rightSmoke = texture2D(densityBufferTexture, vec2(pixel.x + xPixelSize, pixel.y));
+      vec4 leftSmoke = texture2D(densityBufferTexture, vec2(pixel.x - xPixelSize, pixel.y));
+      vec4 upSmoke = texture2D(densityBufferTexture, vec2(pixel.x, pixel.y + yPixelSize));
+      vec4 downSmoke = texture2D(densityBufferTexture, vec2(pixel.x, pixel.y - yPixelSize));
+
+      float FPS_FACTOR = 1.0 / 60.0;
+      float UPDATE_FACTOR = 7.4;
+
+      // float diffuseSmoke = UPDATE_FACTOR * FPS_FACTOR * (leftSmoke.r + rightSmoke.r + downSmoke.r * 3.0 + upSmoke.r - 6.0 * gl_FragColor.r);
+      float diffuseSmoke = UPDATE_FACTOR * FPS_FACTOR * (leftSmoke.g + rightSmoke.g + downSmoke.g + upSmoke.g - 4.0 * gl_FragColor.g);
+
+      // Adjust new smoke values because of bad texel resolution
+      float minimumNewSmoke = 0.003;
+  		if (diffuseSmoke < 0.0 && diffuseSmoke >= -minimumNewSmoke) {
+        diffuseSmoke = -minimumNewSmoke;
+      }
+
+      // TODO: Have operations for all three channels
+
+      gl_FragColor.rgb += diffuseSmoke;
+
+
+      //////////// VELOCITY FIELD  //////////////////
+
+      // float vY = .5 * sin(12.0 * pixel.y); //1 * sin(pixel.y);
+      // float prevY = pixel.y - FPS_FACTOR * vY;
+      // vec4 prevYSmoke = texture2D(densityBufferTexture, vec2(pixel.x, prevY));
+      // gl_FragColor.rgb +=  prevYSmoke.r;
+      //
+      // float vX = .5 * sin(12.0 * pixel.x); //1 * sin(pixel.y);
+      // float prevX = pixel.x - FPS_FACTOR * vX;
+      // vec4 prevXSmoke = texture2D(densityBufferTexture, vec2(prevX, pixel.y));
+      // gl_FragColor.rgb +=  prevXSmoke.r;
+
+
+		 }
+	</script>
+
+
+  <script id="advectShader" type="shader-code">
+		// uniform vec2 res; // Screen resolution
+		uniform sampler2D densityBufferTexture;
+    // uniform sampler2D previousDensity;
+		// uniform vec3 smokeSource; // (x_pos, y_pos, "power")
+    // uniform float radius;
+
+		void main() {
+      vec2 pixel = gl_FragCoord.xy / res.xy;
+      // gl_FragColor = texture2D(densityBufferTexture, pixel );
+      //
+      // // If within the specified radius, add smoke here
+      // float dist = distance(smokeSource.xy, gl_FragCoord.xy);
+      // gl_FragColor.rgb += smokeSource.z * max(radius - dist, 0.0);
+      //
+      // // Additionally, move smoke over from neighboring pixels and vice versa
+      // float xPixelSize = 1.0 / res.x;
+      // float yPixelSize = 1.0 / res.y;
+      //
+      // vec4 rightSmoke = texture2D(densityBufferTexture, vec2(pixel.x + xPixelSize, pixel.y));
+      // vec4 leftSmoke = texture2D(densityBufferTexture, vec2(pixel.x - xPixelSize, pixel.y));
+      // vec4 upSmoke = texture2D(densityBufferTexture, vec2(pixel.x, pixel.y + yPixelSize));
+      // vec4 downSmoke = texture2D(densityBufferTexture, vec2(pixel.x, pixel.y - yPixelSize));
+      //
+      // float FPS_FACTOR = 1.0 / 60.0;
+      // float UPDATE_FACTOR = 7.4;
+      //
+      // // float newSmoke = UPDATE_FACTOR * FPS_FACTOR * (leftSmoke.r + rightSmoke.r + downSmoke.r * 3.0 + upSmoke.r - 6.0 * gl_FragColor.r);
+      // float newSmoke = UPDATE_FACTOR * FPS_FACTOR * (leftSmoke.r + rightSmoke.r + downSmoke.r + upSmoke.r - 4.0 * gl_FragColor.r);
+
+
+      // // Adjust new smoke values because of bad texel resolution
+      // float minimumNewSmoke = 0.003;
+  		// if (newSmoke < 0.0 && newSmoke >= -minimumNewSmoke) {
+      //   newSmoke = -minimumNewSmoke;
+      // }
+
+      // gl_FragColor.rgb += newSmoke;
+      gl_FragColor = texture2D(densityBufferTexture, pixel);
+      // gl_FragColor.r = 0.0;
+
+
+		 }
+	</script>
+
+  <script>
+    // Initialize three.js scene, camera and renderer
+		var camera;
+		var renderer;
+
+		// Set up a vanilla scene
+		finalScene = new THREE.Scene();
+
+		var width = window.innerWidth;
+		var height = window.innerHeight;
+
+		camera = new THREE.OrthographicCamera(-width/2, width/2, height/2, -height/2, 1, 1000);
+		camera.position.z = 2; // Put camera in front of everything
+
+		renderer = new THREE.WebGLRenderer();
+		renderer.setSize(window.innerWidth, window.innerHeight);
+		document.body.appendChild(renderer.domElement);
+
+    // Plane holding all of the graphics
+    var canvas;
+
+		var textureA;
+		var textureB;
+
+    // Buffer variables
+		var bufferMaterial;
+		var bufferObject;
+    var bufferScene;
+
+    // Second buffer
+    var bufferMaterial2;
+		var bufferObject2;
+    var bufferScene2;
+
+    // Actual, displayed scene variables
+		var finalMaterial;
+		var finalObject;
+    var finalScene;
+
+		function buffer_texture_setup(){
+			canvas = new THREE.PlaneBufferGeometry(window.innerWidth, window.innerHeight);
+
+			// Create 2 buffer textures which will eventually hold our buffer scene, taking turns
+      // TextureB is always the one that's on the scene
+      // TextureA is always the one that's in the bufferMaterial/Scene
+			textureA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
+			textureB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+
+
+      // Create buffer scene, which will hold the shader material (bufferMaterial)
+			bufferScene = new THREE.Scene();
+      // Contains the shader and defines uniforms, first passing textureA through
+      bufferMaterial = new THREE.ShaderMaterial( {
+				uniforms: {
+				 densityBufferTexture: {
+           type: "t", value: textureA
+         },
+         previousDensity: {
+            type: "t", value: textureA
+         },
+				 res: { // Screen resolution
+           type: 'v2',
+           value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+         },
+				 smokeSource: { // Represents coordinates / radius / power of an ongoing smoke source
+           type: 'v3',
+           value: new THREE.Vector3(0,0,0)
+         },
+         radius: { // Refer to this for types: https://gamedevelopment.tutsplus.com/tutorials/a-beginners-guide-to-coding-graphics-shaders-part-2--cms-24111
+          type: 'f',
+          value: 12.0
+        },
+        sourceRedWeight: { // Randomized: how much we want to "weight" red in the smoke source for a semi-randominzed color
+          type: 'f',
+          value: 1.0
+        }
+				},
+				fragmentShader: document.getElementById('diffuseShader').innerHTML
+			} );
+			bufferObject = new THREE.Mesh(canvas, bufferMaterial); // create object containing Shader info / screen
+			bufferScene.add(bufferObject); // add this info to buffer scene
+
+
+      // // Create buffer scene, which will hold the shader material (bufferMaterial)
+			// bufferScene2 = new THREE.Scene();
+      // // Contains the shader and defines uniforms, first passing textureA through
+      // bufferMaterial2 = new THREE.ShaderMaterial( {
+			// 	uniforms: {
+			// 	 densityBufferTexture: {
+      //      type: "t", value: textureA
+      //    },
+			// 	fragmentShader: document.getElementById('advectShader').innerHTML
+			//   }
+      // });
+			// bufferObject2 = new THREE.Mesh(canvas, bufferMaterial2); // create object containing Shader info / screen
+			// bufferScene2.add(bufferObject2); // add this info to buffer scene
+
+
+      // Do the same thing for the actual scene/material/object: definitions are parallel to the buffer ones
+      // Draw textureB to material --> mesh --> actual scene
+			finalMaterial =  new THREE.MeshBasicMaterial({map: textureB}); // Contains TextureB
+			finalObject = new THREE.Mesh(canvas, finalMaterial); // Contains the general plane (the entire screen) and textureB
+			finalScene.add(finalObject); // Add to real (non-buffered) scene
+		}
+		buffer_texture_setup();
+
+
+    function generateSmokeAt(x, y, z, radius, red) {
+      bufferMaterial.uniforms.smokeSource.value.x = x;
+		  bufferMaterial.uniforms.smokeSource.value.y = window.innerHeight - y;
+      bufferMaterial.uniforms.smokeSource.value.z = z;
+
+      bufferMaterial.uniforms.radius.value = radius;
+
+      bufferMaterial.uniforms.sourceRedWeight.value = red;
+    }
+
+    var BETWEEN_SMOKE_TIME = 500; // 500 ms before each puff of smoke is generated
+    var GEN_SMOKE_TIME = 100; // Generate smoke from a source for 100 ms
+    function resumeSmoke() {
+      // console.log("Resuming smoke...")
+
+      width = window.innerWidth
+      height = window.innerHeight
+
+      var random_y = (Math.random() - 0.5) * (height / 2); // From 2nd->3rd quarter
+      var radius = (Math.random()*4 + 1.0) * 10; // Varies from 10->50
+      var sourceRedWeight = Math.random();
+
+      console.log(sourceRedWeight)
+
+      generateSmokeAt(width / 2, height / 2 + random_y, 0.1, radius, sourceRedWeight);
+
+      var beforePause = 100;
+      // if (!requestStop) {
+      setTimeout(pauseSmoke, GEN_SMOKE_TIME);
+      // }
+    }
+    function pauseSmoke() {
+      // console.log("Pausing smoke...")
+      bufferMaterial.uniforms.smokeSource.value.z = 0;
+      setTimeout(resumeSmoke, BETWEEN_SMOKE_TIME);
+    }
+    resumeSmoke()
+
+		function render() {
+		  requestAnimationFrame(render); // Set this function as the callback for the future
+
+      // Steps according to https://gamedevelopment.tutsplus.com/tutorials/quick-tip-how-to-render-to-a-texture-in-threejs--cms-25686
+        // 1. Create a scene to hold your objects.
+        // 2. Create a texture to store what you render
+        // 3. Render your scene onto your texture
+
+       // Assume that textureA thru the shader (thru bufferMaterial)
+		   // Now, move bufferscene objects (result of passing A through shader) --> textureB
+		  renderer.render(bufferScene, camera, textureB, true); // This is the line that maintains the pairing between txtA and txtB
+
+      // bufferMaterial2.uniforms.densityBufferTexture.value = textureB;
+      // renderer.render(bufferScene2, camera, textureB, true);
+
+      // This line applies to any WebGL project; draw to screen
+      // Render texture B to the scene (through finalObject since we just swapped it)
+		  renderer.render(finalScene, camera );
+
+		  var swap = textureA;
+		  textureA = textureB;
+		  textureB = swap;
+
+		  bufferMaterial.uniforms.densityBufferTexture.value = textureA; // Swap the buffer's texture to textureA
+      finalObject.material.map = textureB; // "finalObject" is an object that has been added to the scene
+		}
+		render();
+  </script>
+</body>
+</html>
