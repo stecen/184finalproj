@@ -65,65 +65,43 @@
       // TODO: Have operations for all three channels
 
       gl_FragColor.rgb += diffuseSmoke;
-
-
-      //////////// VELOCITY FIELD  //////////////////
-
-      // float vY = .5 * sin(12.0 * pixel.y); //1 * sin(pixel.y);
-      // float prevY = pixel.y - FPS_FACTOR * vY;
-      // vec4 prevYSmoke = texture2D(densityBufferTexture, vec2(pixel.x, prevY));
-      // gl_FragColor.rgb +=  prevYSmoke.r;
-      //
-      // float vX = .5 * sin(12.0 * pixel.x); //1 * sin(pixel.y);
-      // float prevX = pixel.x - FPS_FACTOR * vX;
-      // vec4 prevXSmoke = texture2D(densityBufferTexture, vec2(prevX, pixel.y));
-      // gl_FragColor.rgb +=  prevXSmoke.r;
-
-
 		 }
 	</script>
 
 
   <script id="advectShader" type="shader-code">
-		// uniform vec2 res; // Screen resolution
+		uniform vec2 res; // Screen resolution
 		uniform sampler2D densityBufferTexture;
     // uniform sampler2D previousDensity;
 		// uniform vec3 smokeSource; // (x_pos, y_pos, "power")
     // uniform float radius;
 
 		void main() {
+      float FPS_FACTOR = 1.0 / 60.0;
+
       vec2 pixel = gl_FragCoord.xy / res.xy;
-      // gl_FragColor = texture2D(densityBufferTexture, pixel );
-      //
-      // // If within the specified radius, add smoke here
-      // float dist = distance(smokeSource.xy, gl_FragCoord.xy);
-      // gl_FragColor.rgb += smokeSource.z * max(radius - dist, 0.0);
-      //
-      // // Additionally, move smoke over from neighboring pixels and vice versa
-      // float xPixelSize = 1.0 / res.x;
-      // float yPixelSize = 1.0 / res.y;
-      //
-      // vec4 rightSmoke = texture2D(densityBufferTexture, vec2(pixel.x + xPixelSize, pixel.y));
-      // vec4 leftSmoke = texture2D(densityBufferTexture, vec2(pixel.x - xPixelSize, pixel.y));
-      // vec4 upSmoke = texture2D(densityBufferTexture, vec2(pixel.x, pixel.y + yPixelSize));
-      // vec4 downSmoke = texture2D(densityBufferTexture, vec2(pixel.x, pixel.y - yPixelSize));
-      //
-      // float FPS_FACTOR = 1.0 / 60.0;
-      // float UPDATE_FACTOR = 7.4;
-      //
-      // // float newSmoke = UPDATE_FACTOR * FPS_FACTOR * (leftSmoke.r + rightSmoke.r + downSmoke.r * 3.0 + upSmoke.r - 6.0 * gl_FragColor.r);
-      // float newSmoke = UPDATE_FACTOR * FPS_FACTOR * (leftSmoke.r + rightSmoke.r + downSmoke.r + upSmoke.r - 4.0 * gl_FragColor.r);
+      // gl_FragColor = texture2D(densityBufferTexture, pixel);
+
+      // gl_FragColor = vec4(0.0,0.0,0.0,1.0);
+
+      // float vY = max(min(.5 * sin(6 * pixel.y), 0.9), 0.1);
+      // float vY = pixel.y;
+      // float vY = sin(0.7);
+      // float vY = 1.0;
+      float dY = 0.5*(1.0-pixel.y); //0.2 * cos(32.0  * pixel.y);
+      float prevY = pixel.y - FPS_FACTOR * dY;
+      float dX = 0.1 * sin(32.0 * pixel.x);
+      float prevX = pixel.x - FPS_FACTOR * dX;
+
+      vec4 prevSmoke = texture2D(densityBufferTexture, vec2(prevX, prevY));
+      gl_FragColor.xyz = prevSmoke.xyz;
+
+      // vec4 prevYSmoke = texture2D(densityBufferTexture, vec2(pixel.x, prevY));
+      // gl_FragColor.xyz += prevYSmoke.xyz;
 
 
-      // // Adjust new smoke values because of bad texel resolution
-      // float minimumNewSmoke = 0.003;
-  		// if (newSmoke < 0.0 && newSmoke >= -minimumNewSmoke) {
-      //   newSmoke = -minimumNewSmoke;
-      // }
-
-      // gl_FragColor.rgb += newSmoke;
-      gl_FragColor = texture2D(densityBufferTexture, pixel);
-      // gl_FragColor.r = 0.0;
+      // vec4 prevXSmoke = texture2D(densityBufferTexture, vec2(prevX, pixel.y));
+      // gl_FragColor.xyz += prevXSmoke.xyz;
 
 
 		 }
@@ -150,20 +128,20 @@
     // Plane holding all of the graphics
     var canvas;
 
-		var textureA;
-		var textureB;
-
     // Buffer variables
+    var textureA;
 		var bufferMaterial;
 		var bufferObject;
     var bufferScene;
 
     // Second buffer
+    var textureB;
     var bufferMaterial2;
 		var bufferObject2;
     var bufferScene2;
 
     // Actual, displayed scene variables
+    var textureC;
 		var finalMaterial;
 		var finalObject;
     var finalScene;
@@ -176,6 +154,7 @@
       // TextureA is always the one that's in the bufferMaterial/Scene
 			textureA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
 			textureB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      textureC = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
 
 
       // Create buffer scene, which will hold the shader material (bufferMaterial)
@@ -212,24 +191,27 @@
 			bufferScene.add(bufferObject); // add this info to buffer scene
 
 
-      // // Create buffer scene, which will hold the shader material (bufferMaterial)
-			// bufferScene2 = new THREE.Scene();
-      // // Contains the shader and defines uniforms, first passing textureA through
-      // bufferMaterial2 = new THREE.ShaderMaterial( {
-			// 	uniforms: {
-			// 	 densityBufferTexture: {
-      //      type: "t", value: textureA
-      //    },
-			// 	fragmentShader: document.getElementById('advectShader').innerHTML
-			//   }
-      // });
-			// bufferObject2 = new THREE.Mesh(canvas, bufferMaterial2); // create object containing Shader info / screen
-			// bufferScene2.add(bufferObject2); // add this info to buffer scene
-
+      // Create buffer scene, which will hold the shader material (bufferMaterial)
+			bufferScene2 = new THREE.Scene();
+      // Contains the shader and defines uniforms, first passing textureA through
+      bufferMaterial2 = new THREE.ShaderMaterial( {
+				uniforms: {
+				 densityBufferTexture: {
+           type: "t", value: textureB
+         },
+         res: { // Screen resolution
+           type: 'v2',
+           value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+         }
+       },
+			fragmentShader: document.getElementById('advectShader').innerHTML
+      } );
+			bufferObject2 = new THREE.Mesh(canvas, bufferMaterial2); // create object containing Shader info / screen
+			bufferScene2.add(bufferObject2); // add this info to buffer scene
 
       // Do the same thing for the actual scene/material/object: definitions are parallel to the buffer ones
       // Draw textureB to material --> mesh --> actual scene
-			finalMaterial =  new THREE.MeshBasicMaterial({map: textureB}); // Contains TextureB
+			finalMaterial =  new THREE.MeshBasicMaterial({map: textureC}); // Contains TextureB
 			finalObject = new THREE.Mesh(canvas, finalMaterial); // Contains the general plane (the entire screen) and textureB
 			finalScene.add(finalObject); // Add to real (non-buffered) scene
 		}
@@ -254,13 +236,14 @@
       width = window.innerWidth
       height = window.innerHeight
 
+      var random_x = (Math.random() - 0.5) * (height / 3);
       var random_y = (Math.random() - 0.5) * (height / 2); // From 2nd->3rd quarter
       var radius = (Math.random()*4 + 1.0) * 10; // Varies from 10->50
       var sourceRedWeight = Math.random();
 
       console.log(sourceRedWeight)
 
-      generateSmokeAt(width / 2, height / 2 + random_y, 0.1, radius, sourceRedWeight);
+      generateSmokeAt(width / 2 + random_x, height / 2 + random_y, 0.1, radius, sourceRedWeight);
 
       var beforePause = 100;
       // if (!requestStop) {
@@ -286,6 +269,9 @@
 		   // Now, move bufferscene objects (result of passing A through shader) --> textureB
 		  renderer.render(bufferScene, camera, textureB, true); // This is the line that maintains the pairing between txtA and txtB
 
+      //////// NEW //////// !!!
+      renderer.render(bufferScene2, camera, textureC, true)
+
       // bufferMaterial2.uniforms.densityBufferTexture.value = textureB;
       // renderer.render(bufferScene2, camera, textureB, true);
 
@@ -294,11 +280,11 @@
 		  renderer.render(finalScene, camera );
 
 		  var swap = textureA;
-		  textureA = textureB;
-		  textureB = swap;
+		  textureA = textureC;
+		  textureC = swap;
 
 		  bufferMaterial.uniforms.densityBufferTexture.value = textureA; // Swap the buffer's texture to textureA
-      finalObject.material.map = textureB; // "finalObject" is an object that has been added to the scene
+      finalObject.material.map = textureC; // "finalObject" is an object that has been added to the scene
 		}
 		render();
   </script>
