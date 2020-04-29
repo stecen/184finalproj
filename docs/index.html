@@ -42,10 +42,29 @@
 </div>
 
 
-<p>As seen above, we are able to render to the webpage using Three.js and have a simulation that operates through a few frame buffers and fragment shaders. A few aspects that we need are in place: A diffusion shader (and corresponding buffer), an advection shader that simulates the effects of a velocity field, and the code for continiously rendering to the screen and updating. As seen, in our results so far, we have not implemented more sophisticated diffusion and advection which will be based on real physics equations. However, our progress has given us a good idea of how we can manipulate our simulation, as well as provided us with an actual visualization of our work.</p>
+<p>As seen above, we are able to render to the webpage using Three.js and have a
+  simulation that operates through a few frame buffers and fragment shaders.
+  A few aspects that we need are in place: A diffusion shader (and corresponding
+  buffer), an advection shader (and a corresponding buffer) that simulates the
+  effects of a constant velocity field, and the code for continiously rendering to the
+  screen and updating the animation frame. Every 500ms, matching an imaginary "beat",
+  parameters for a smoke source are generated; the diffusion shader takes in these uniform inputs
+  for random positions to generate smoke sources, with are circular, and then moves
+  the smoke density into surrounding pixels. This is rendered onto a frame buffer
+  which then passes through the advection shader, which uses a constant vector field of (.5 * (1-x), .5 * (1-y)),
+  backwards tracing, and built-in linear interpolation to "move" density around.
+  As seen in our results so far, we have not implemented
+  more sophisticated concepts such as vorticity and advection of the velocity field itself,
+  which will be based on real physics equations to make the material actually look fluid.
+   However, our progress has given us a good idea of how we can
+  manipulate our simulation, as well as provided us with an actual visualization
+  of our work; for example, we are now thinking of trying to generate smoke sources
+  according to the pulse of music's pulse, and have the y-coordinate and/or smoke color
+  correspond to the frequency of the music in some way. </p>
 
 <h3>Looking Ahead</h3>
-<p>Our schedule with modifications can be found below. Right now we have done two of the three parts of week 2. Considering where we are right now, we see that the most important part is probably to make our simulation robust by implementing some physics and making sure it is a good looking simulation. This will take priority over any signal processing/music data work, as that can be replaced by simpler, preprocessed data from relevant resources. By focusing on the simulation and visulization we should be able to create a good looking simulation and resulting music visulization, which looks to be our baseline right now. If we have extra time, we can look into music processing and add extra features. 
+<p>Our schedule with modifications can be found below. Right now we have done
+  two of the three parts of week 2. Considering where we are right now, we see that the most important part is probably to make our simulation robust by implementing some physics and making sure it is a good looking simulation. This will take priority over any signal processing/music data work, as that can be replaced by simpler, preprocessed data from relevant resources. By focusing on the simulation and visulization we should be able to create a good looking simulation and resulting music visulization, which looks to be our baseline right now. If we have extra time, we can look into music processing and add extra features.
 </p>
 
 
@@ -71,6 +90,10 @@
 <p>- Extra time for debugging <br>
 - Finalize website and rest of deliverable requirements
 </p>
+
+<h3>Presentation Link</h3>
+<a href="https://docs.google.com/presentation/d/1IlW76ooitt4EdzzoWpSeLH2ye_N4w7lraisGdu7XQzs/edit?usp=sharing">https://docs.google.com/presentation/d/1IlW76ooitt4EdzzoWpSeLH2ye_N4w7lraisGdu7XQzs/edit?usp=sharing<a>
+
 
 </body>
 </html>
