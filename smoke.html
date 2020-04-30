@@ -88,9 +88,11 @@
       // float vY = pixel.y;
       // float vY = sin(0.7);
       // float vY = 1.0;
-      float dY = 0.5*(1.0-pixel.y); //0.2 * cos(32.0  * pixel.y);
+      float dY = 0.5*(1.0-pixel.y);
+      // float dY = 0.2 * sin(64.0  * pixel.y);
       float prevY = pixel.y - FPS_FACTOR * dY;
-      float dX = 0.4*(1.0-pixel.x);//0.1 * sin(32.0 * pixel.x);
+      float dX = 0.4*(1.0-pixel.x);
+      // float dX = 0.1 * sin(64.0 * pixel.x);
       float prevX = pixel.x - FPS_FACTOR * dX;
 
       vec4 prevSmoke = texture2D(densityBufferTexture, vec2(prevX, prevY));
@@ -150,7 +152,7 @@
       canvas = new THREE.PlaneBufferGeometry(window.innerWidth, window.innerHeight);
 
       // Create 2 buffer textures which will eventually hold our buffer scene, taking turns
-      // TextureB is always the one that's on the scene
+      // TextureC is always the one that's on the scene
       // TextureA is always the one that's in the bufferMaterial/Scene
       textureA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
       textureB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
@@ -192,6 +194,8 @@
       bufferObject = new THREE.Mesh(canvas, bufferMaterial); // create object containing Shader info / screen
       bufferScene.add(bufferObject); // add this info to buffer scene
 
+
+      //////// ADVECTION ////////
 
       // Create buffer scene, which will hold the shader material (bufferMaterial)
       bufferScene2 = new THREE.Scene();
@@ -281,7 +285,7 @@
 
       // This line applies to any WebGL project; draw to screen
       // Render texture C to the scene (through finalObject since we just swapped it)
-      renderer.render(finalScene, camera );
+      renderer.render(finalScene, camera);
 
       var swap = textureA;
       textureA = textureC;
