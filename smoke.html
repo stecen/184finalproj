@@ -74,15 +74,15 @@
   <script id="advectShader" type="shader-code">
     uniform vec2 res; // Screen resolution
     uniform sampler2D textureAdvect;
-    
+
     uniform sampler2D textureXVel;
     uniform sampler2D textureYVel;
-    
+
     void main() {
       float FPS_FACTOR = 1.0 / 60.0;
-  
+
       vec2 pixel = gl_FragCoord.xy / res.xy;
-  
+
       // Pixel-values not float from 0-1
       // float realX = gl_FragCoord.xy.x;
       // float realY = gl_FragCoord.xy.y;
@@ -91,16 +91,16 @@
       // float dX = sin(2.0 * 3.14156 * realX); // 0 Divergence
       float dX = texture2D(textureXVel, pixel);
       float prevX = pixel.x - FPS_FACTOR * dX;
-  
+
       // float dY = sin(2.0 * 3.14156 * realY); // 0 Divergence
       float dY = texture2D(textureYVel, pixel);
       float prevY = pixel.y - FPS_FACTOR * dY;
-  
-  
+
+
       vec4 prevSmoke = texture2D(textureAdvect, vec2(prevX, prevY));
       gl_FragColor.xyz = prevSmoke.xyz;
-  
-  
+
+
      }
   </script>
 
@@ -121,7 +121,7 @@
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
-    
+
     ////////////////// DENSITY / SCREEN BUFFERS /////////////////////////
 
     // Plane holding all of the graphics
@@ -140,21 +140,21 @@
     var bufferMaterialAdvec;
     var bufferObjectAdvec;
     var bufferSceneAdvec;
-    
+
     // Divergence Buffer
     var textureX;
     var textureY;
     var bufferMaterialDiv;
     var bufferObjectDiv;
     var bufferSceneDiv;
-    
+
     // Pressure Buffer
     var textureDiv;
     var texturePres;
     var bufferMaterialPres;
     var bufferObjectPres;
     var bufferScenePres;
-    
+
     // Gradient Buffer
     var textureGrad;
     var bufferMaterialGrad;
@@ -166,17 +166,17 @@
     var finalMaterial;
     var finalObject;
     var finalScene;
-    
+
     // Intermediate Textures
     var texturePresI;
     var textureDensI;
-    
+
     // TODO: Change advention shader to take x and y velocity
     // three new shaders: divergence, pressure, gradient
     //    - all take 2 input textures
-    
-    
-    
+
+
+
 
     function buffer_texture_setup(){
       canvas = new THREE.PlaneBufferGeometry(window.innerWidth, window.innerHeight);
@@ -185,7 +185,8 @@
       // TextureFinal is always the one that's on the scene
       // TextureDiff is always the one that's in the bufferMaterial/Scene
       textureDiff = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
-      textureAdvec = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      textureAdvect = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+
       textureFinal = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
       textureXVel = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
       textureYVel = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
@@ -241,7 +242,7 @@
       // Contains the shader and defines uniforms, first passing textureA through
       bufferMaterialAdvec = new THREE.ShaderMaterial( {
         uniforms: {
-         texureAdvect: {
+         textureAdvect: {
            type: "t", value: textureAdvect
          },
          textureXVel: {
@@ -316,25 +317,25 @@
         // 3. Render your scene onto your texture
 
         // VELOCITY STEP
-      
+
       // Set Diffusion Buffer input to X-velocity texture.
       textureDiff = textureXVel;
-      
+
       // Diffuse X-velocity texture into textureX.
       renderer.render(bufferDiff, camera, textureX, true);
-      
+
       // Set Diffusion Buffer input to Y-velocity texture.
       textureDiff = textureYVel;
-      
+
       // Diffuse Y-velocity texture into textureY.
       renderer.render(bufferDiff, camera, textureY, true);
-      
+
       // Generate divergence texture from X and Y velocity textures.
       renderer.render(bufferDiv, camera, textureDiv, true);
-      
+
       // Initialize texturePres to 0 at all points.
       texturePres = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
-      
+
       // Run the Pressure Buffer on itself 20 times.
       var i;
       for (i = 0; i < 20; i++) {
@@ -343,25 +344,25 @@
         // Set the pressure texture to the intermediate texture.
         texturePres = texturePresI;
       }
-      
+
       // Set Gradient Buffer input to the x-velocity texture.
       textureGrad = textureX;
-      
+
       // Generate the mass-consistent x-velocity texture.
       renderer.render(bufferGrad, camera, textureXVel, true);
-      
+
       // Set Gradient Buffer input to the y-velocity texture.
       textureGrad = textureY;
-      
+
       // Generate the mass-consistent y-velocity texture.
       renderer.render(bufferGrad, camera, textureYVel, true);
-      
+
       // Set Advection Buffer input to x-velocity texture.
       // THIS IS WHERE I AM, CONTINUE FROM HERE
       // TODO: Finish rendering pipeline, finish renaming values,
       // add three additional buffers, implement three new shaders.
-      
-      
+
+
        // Assume that textureA thru the shader (thru bufferMaterial)
        // Now, move bufferscene objects (result of passing A through shader) --> textureB
       renderer.render(bufferScene, camera, textureB, true); // This is the line that maintains the pairing between txtA and txtB
