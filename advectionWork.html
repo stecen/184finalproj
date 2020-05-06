@@ -127,8 +127,79 @@
   </script>
 
   <script id="velInitShader" type="shader-code">
+    uniform vec2 res;  
     void main() {
-      gl_FragColor.xyz = vec3(1.0, -1.0, 0);
+
+      vec2 pixel = gl_FragCoord.xy / res.xy;
+      float xVel = sin(2.0 * 3.14159 * pixel.x);
+      float yVel = sin(2.0 * 3.14159 * pixel.y);
+      gl_FragColor.xyz = vec3(yVel, xVel, 0);
+     }
+  </script>
+
+  <script id="divShader" type="shader-code">
+
+    uniform vec2 res; // Screen resolution
+    uniform sampler2D textureV;
+
+    void main() {
+     
+      vec2 pixel = gl_FragCoord.xy / res.xy;
+      float xPixelSize = 1.0 / res.x;
+      float yPixelSize = 1.0 / res.y;
+
+      vec4 rightVel = texture2D(textureV, vec2(pixel.x + xPixelSize, pixel.y));
+      vec4 leftVel = texture2D(textureV, vec2(pixel.x - xPixelSize, pixel.y));
+      vec4 upVel = texture2D(textureV, vec2(pixel.x, pixel.y + yPixelSize));
+      vec4 downVel = texture2D(textureV, vec2(pixel.x, pixel.y - yPixelSize));
+
+
+      gl_FragColor.r = -0.5 * xPixelSize * (rightVel.x - leftVel.x + upVel.y - downVel.y); // h = xPixelSize here but x might not equal ysize
+     }
+  </script>
+
+  <script id="pressureShader" type="shader-code">
+
+    uniform vec2 res; // Screen resolution
+    uniform sampler2D textureDiv;
+    uniform sampler2D texturePres;
+
+    void main() {
+     
+      vec2 pixel = gl_FragCoord.xy / res.xy;
+      float xPixelSize = 1.0 / res.x;
+      float yPixelSize = 1.0 / res.y;
+      vec4 div = texture2D(textureDiv, pixel);
+      vec4 rightP = texture2D(texturePres, vec2(pixel.x + xPixelSize, pixel.y));
+      vec4 leftP = texture2D(texturePres, vec2(pixel.x - xPixelSize, pixel.y));
+      vec4 upP = texture2D(texturePres, vec2(pixel.x, pixel.y + yPixelSize));
+      vec4 downP = texture2D(texturePres, vec2(pixel.x, pixel.y - yPixelSize));
+
+
+      gl_FragColor.r = (div + rightP + leftP + upP + downP) / 4.0;
+     }
+  </script>
+
+   <script id="gradShader" type="shader-code">
+
+    uniform vec2 res; // Screen resolution
+    uniform sampler2D textureGrad;
+    uniform sampler2D textureVprev
+
+    void main() {
+     
+      vec2 pixel = gl_FragCoord.xy / res.xy;
+      float xPixelSize = 1.0 / res.x;
+      float yPixelSize = 1.0 / res.y;
+      vec4 prevVel = texture2D(textureVprev, pixel);
+      vec4 rightGrad = texture2D(textureGrad, vec2(pixel.x + xPixelSize, pixel.y));
+      vec4 leftGrad = texture2D(textureGrad, vec2(pixel.x - xPixelSize, pixel.y));
+      vec4 upGrad = texture2D(textureGrad, vec2(pixel.x, pixel.y + yPixelSize));
+      vec4 downGrad = texture2D(textureGrad, vec2(pixel.x, pixel.y - yPixelSize));
+
+      gl_FragColor.x = prevVel.x - (0.5 * (rightGrad - leftGrad) / xPixelSize);
+      gl_FragColor.y = prevVel.y - (0.5 * (upGrad - dowGrad) / yPixelSize);
+
      }
   </script>
 
@@ -191,6 +262,7 @@
 
     // Gradient Buffer
     var textureGrad;
+    var textureVprev
     var bufferMaterialGrad;
     var bufferObjectGrad;
     var bufferSceneGrad;
@@ -236,12 +308,16 @@
 
       textureVel = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, type: THREE.FloatType } );
 
-      textureV = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      textureV = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, type: THREE.FloatType} );
 
-      textureDiv = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
-      texturePres = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
-      texturePresI = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
-      textureGrad = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      textureDiv = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, type: THREE.FloatType} );
+      texturePres = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, type: THREE.FloatType } );
+      texturePresI = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, type: THREE.FloatType } );
+
+
+      textureVprev = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, type: THREE.FloatType } );
+
+      textureGrad = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, type: THREE.FloatType } );
       textureDensI = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
       //// SOURCE ////
 
@@ -329,6 +405,66 @@
       bufferObjectAdvec = new THREE.Mesh(canvas, bufferMaterialAdvec); // create object containing Shader info / screen
       bufferSceneAdvec.add(bufferObjectAdvec); // add this info to buffer scene
 
+      /////// DIVERGENCE ////////
+      bufferSceneDiv = new THREE.Scene();
+      // Contains the shader and defines uniforms, first passing textureA through
+      bufferMaterialDiv = new THREE.ShaderMaterial( {
+        uniforms: {
+         textureV: {
+          type: "t", value: textureV
+         },
+         res: { // Screen resolution
+           type: 'v2',
+           value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+         }
+       },
+      fragmentShader: document.getElementById('divShader').innerHTML
+      } );
+      bufferObjectDiv= new THREE.Mesh(canvas, bufferMaterialDiv); // create object containing Shader info / screen
+      bufferSceneDiv.add(bufferObjectDiv); // add this info to buffer scene
+
+       /////// PRESSURE ////////
+      bufferScenePres = new THREE.Scene();
+      // Contains the shader and defines uniforms, first passing textureA through
+      bufferMaterialPres = new THREE.ShaderMaterial( {
+        uniforms: {
+         textureDiv: {
+          type: "t", value: textureDiv
+         },
+         texturePres: {
+          type: "t", value: texturePres
+         },
+         res: { // Screen resolution
+           type: 'v2',
+           value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+         }
+       },
+      fragmentShader: document.getElementById('pressureShader').innerHTML
+      } );
+      bufferObjectPres= new THREE.Mesh(canvas, bufferMaterialPres); // create object containing Shader info / screen
+      bufferScenePres.add(bufferObjectPres); // add this info to buffer scene
+
+      /////// GRADIENT ////////
+      bufferSceneGrad = new THREE.Scene();
+      // Contains the shader and defines uniforms, first passing textureA through
+      bufferMaterialGrad = new THREE.ShaderMaterial( {
+        uniforms: {
+         textureGrad: {
+          type: "t", value: textureGrad
+         },
+         textureVprev: {
+          type: "t", value: textureVprev
+         },
+         res: { // Screen resolution
+           type: 'v2',
+           value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+         }
+       },
+      fragmentShader: document.getElementById('gradShader').innerHTML
+      } );
+      bufferObjectGrad= new THREE.Mesh(canvas, bufferMaterialGrad); // create object containing Shader info / screen
+      bufferSceneGrad.add(bufferObjectGrad); // add this info to buffer scene
+
 
       /////// TODO: TEMPORARY CODE ///////
       // Do the same thing for the actual scene/material/object: definitions are parallel to the buffer ones
@@ -341,7 +477,10 @@
       // INITIALIZING VELOCITY FIELD
       bufferSceneVel = new THREE.Scene();
       bufferMaterialVel = new THREE.ShaderMaterial( {
-        uniforms: {},
+        uniforms: {res: { // Screen resolution
+           type: 'v2',
+           value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+         }},
         fragmentShader: document.getElementById('velInitShader').innerHTML
       } );
       bufferObjectVel = new THREE.Mesh(canvas, bufferMaterialVel); // create object containing Shader info / screen
@@ -361,8 +500,8 @@
 
     }
 
-    var BETWEEN_SMOKE_TIME = 500; // 500 ms before each puff of smoke is generated
-    var GEN_SMOKE_TIME = 100; // Generate smoke from a source for 100 ms
+    var BETWEEN_SMOKE_TIME = 1100; // 500 ms before each puff of smoke is generated
+    var GEN_SMOKE_TIME = 300; // Generate smoke from a source for 100 ms
     function resumeSmoke() {
       // console.log("Resuming smoke...")
 
