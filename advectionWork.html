@@ -3,11 +3,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.min.js"></script>
   <style>
     /* We want our scene to span the entire window */
-    body { margin: 0; }
+    body { margin: 0;}
   </style>
 </head>
-<body>
-
+<body onclick="mouseClicked(event)">
   <script id="sourceShader" type="shader-code">
 
     uniform vec2 res; // Screen resolution
@@ -51,7 +50,6 @@
 
     uniform vec3 smokeSource; // (x_pos, y_pos, "power")
     uniform float radius;
-    uniform float sourceRedWeight;
 
     void main() {
       // Fragcoord and res are both in width x height --> have to convert to 0->1.0 range
@@ -370,10 +368,6 @@
           type: 'f',
           value: 12.0
         },
-        sourceRedWeight: { // Randomized: how much we want to "weight" red in the smoke source for a semi-randominzed color
-          type: 'f',
-          value: 1.0
-        }
         },
         fragmentShader: document.getElementById('diffuseShader').innerHTML
       } );
@@ -500,8 +494,12 @@
 
     }
 
+    function mouseClicked(event) {
+      generateSmokeAt(event.clientX, event.clientY, 0.1, 30)
+    }
+
     var BETWEEN_SMOKE_TIME = 1100; // 500 ms before each puff of smoke is generated
-    var GEN_SMOKE_TIME = 300; // Generate smoke from a source for 100 ms
+    var GEN_SMOKE_TIME = 1; // Generate smoke from a source for 100 ms
     function resumeSmoke() {
       // console.log("Resuming smoke...")
 
@@ -537,21 +535,33 @@
       // // VELOCITY STEP
       //
       // // Set Diffusion Buffer input to velocity texture.
-      // textureDiff = textureVel;
-      // bufferMaterialDiff.uniforms.textureDiff.value = textureDiff;
-      //
+      //textureDiff = textureVel
+      bufferMaterialDiff.uniforms.textureDiff.value = textureVel;
       // // Set Diffusion Buffer baseline to its initial input.
-      // textureDiffO = textureDiff;
-      // bufferMaterialDiff.uniforms.textureDiffO.value = textureDiffO;
+      textureDiffO = textureVel.clone();
+      bufferMaterialDiff.uniforms.textureDiffO.value = textureDiffO;
       //
       // // Run the Diffusion Buffer on itself 20 times.
-      // var i;
-      // for (i = 0; i < 20; i++) {
-      //   renderer.render(bufferSceneDiff, camera, textureDiffI, true);
-      //   textureDiff = textureDiffI;
-     	// 	bufferMaterialDiff.uniforms.textureDiff.value = textureDiff;
-      // }
-      //
+      var i;
+      for (i = 0; i < 20; i++) {
+        renderer.render(bufferSceneDiff, camera, textureDiffI, true);
+        var swap = textureVel;
+        textureVel = textureDiffI;
+        textureDiffI = swap;
+        bufferMaterialDiff.uniforms.textureDiff.value = textureVel;
+      }
+
+      bufferMaterialAdvec.uniforms.textureVel.value = textureVel;
+      //finalObject.material.map = textureVel;
+      //textureVel = textureDiff;
+      //renderer.render(bufferSceneDiff, camera, textureFinal, true);
+
+      // var swapVel = textureVel;
+      // textureVel = textureDiff;
+      // textureDiff = textureVel;
+      // bufferMaterialAdvec.uniforms.textureVel.value = textureVel;
+
+      //textureVel = textureDiff.clone();
       // // Set Divergence Buffer input to Diffusion Buffer output.
       // textureV = textureDiff
       //
@@ -618,15 +628,15 @@
 
       // DENSITY SOURCE
 
-      renderer.render(bufferSceneSource, camera, textureDiff, true)
+      renderer.render(bufferSceneSource, camera, textureDiff, true) // Source will bring in the density from prev step into textureDiff so we don't need to worry that we are using textureDiff in velocity step for other stuff
 
       // DENSITY DIFFUSION
-
+      bufferMaterialDiff.uniforms.textureDiff.value = textureDiff;
       textureDiffO = textureDiff.clone();
       bufferMaterialDiff.uniforms.textureDiffO.value = textureDiffO;
 
-      var i;
-      for (i = 0; i < 20; i++) {
+      var j;
+      for (j = 0; j < 20; j++) {
         renderer.render(bufferSceneDiff, camera, textureDiffI, true);
         var swap = textureDiff;
         textureDiff = textureDiffI;
@@ -647,14 +657,18 @@
 
       // This line applies to any WebGL project; draw to screen
       // Render texture C to the scene (through finalObject since we just swapped it)
-
+      //textureFinal = textureVel;
+      //finalObject.material.map = textureFinal;
       renderer.render(finalScene, camera);
 
       // textureDensI = textureFinal;
       // finalObject.material.map = textureFinal; // "finalObject" is an object that has been added to the scene
 
-
-      // oops
+      // var swap = textureVel;
+      // textureVel = textureFinal;
+      // textureFinal = swap;
+      // bufferMaterialSource.uniforms.textureDiff.value = textureVel; // Swap the buffer's texture to textureA
+      // finalObject.material.map = textureFinal; // "finalObject" is an object that has been added to the scene
 
       var swap = textureSource;
       textureSource = textureFinal;
