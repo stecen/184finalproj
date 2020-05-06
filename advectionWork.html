@@ -1,0 +1,529 @@
+<html>
+<head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r71/three.min.js"></script>
+  <style>
+    /* We want our scene to span the entire window */
+    body { margin: 0; }
+  </style>
+</head>
+<body>
+
+  <script id="sourceShader" type="shader-code">
+
+    uniform vec2 res; // Screen resolution
+    uniform sampler2D textureSource;
+
+    uniform vec3 smokeSource; // (x_pos, y_pos, "power")
+    uniform float radius;
+
+    void main() {
+      // Fragcoord and res are both in width x height --> have to convert to 0->1.0 range
+      // Which is the range 'pixel' is within
+      vec2 pixel = gl_FragCoord.xy / res.xy;
+
+      // gl_FragColor is our "return value" for thie pixel
+      gl_FragColor = texture2D(textureSource, pixel);
+      //gl_FragColor = vec4(0, 0, 0, 1);
+      //////////// SOURCE  //////////////////
+
+      // If within the specified radius, add smoke here
+      float dist = distance(smokeSource.xy, gl_FragCoord.xy);
+      float sourceSmokeAmt = smokeSource.z * max(radius - dist, 0.0); // don't go outside radius
+      float finalSourceRed = sourceSmokeAmt;
+      float finalSourceGreen = sourceSmokeAmt;
+      float finalSourceBlue = sourceSmokeAmt;
+      gl_FragColor.r += finalSourceRed; // * sourceRedWeight;
+      gl_FragColor.g += finalSourceGreen;
+      gl_FragColor.b += finalSourceBlue;
+      // gl_FragColor.r = gl_FragColor.r * sourceRedWeight;
+
+      // Additionally, move smoke over from neighboring pixels and vice versa
+      float xPixelSize = 1.0 / res.x;
+      float yPixelSize = 1.0 / res.y;
+     }
+  </script>
+
+  <script id="diffuseShader" type="shader-code">
+
+    uniform vec2 res; // Screen resolution
+    uniform sampler2D textureDiff;
+    uniform sampler2D textureDiffO;
+
+    uniform vec3 smokeSource; // (x_pos, y_pos, "power")
+    uniform float radius;
+    uniform float sourceRedWeight;
+
+    void main() {
+      // Fragcoord and res are both in width x height --> have to convert to 0->1.0 range
+      // Which is the range 'pixel' is within
+      vec2 pixel = gl_FragCoord.xy / res.xy;
+
+      // gl_FragColor is our "return value" for thie pixel
+      //gl_FragColor = texture2D(textureDiff, pixel);
+      gl_FragColor = vec4(0, 0, 0, 1);
+      //////////// SOURCE  //////////////////
+
+      // Additionally, move smoke over from neighboring pixels and vice versa
+      float xPixelSize = 1.0 / res.x;
+      float yPixelSize = 1.0 / res.y;
+
+      //////////// DIFFUSE  //////////////////
+
+      vec4 rightSmoke = texture2D(textureDiff, vec2(pixel.x + xPixelSize, pixel.y));
+      vec4 leftSmoke = texture2D(textureDiff, vec2(pixel.x - xPixelSize, pixel.y));
+      vec4 upSmoke = texture2D(textureDiff, vec2(pixel.x, pixel.y + yPixelSize));
+      vec4 downSmoke = texture2D(textureDiff, vec2(pixel.x, pixel.y - yPixelSize));
+
+      vec4 previousSmoke = texture2D(textureDiffO, pixel);
+
+      // TODO: If bottom of screen (edge), set to 0
+
+      float FPS_FACTOR = 1.0 / 60.0;
+      float UPDATE_FACTOR = 1.0;//7.4;
+
+      float a = UPDATE_FACTOR * FPS_FACTOR;
+      a = -1.5;
+
+      // float diffuseSmoke = UPDATE_FACTOR * FPS_FACTOR * (leftSmoke.r + rightSmoke.r + downSmoke.r * 3.0 + upSmoke.r - 6.0 * gl_FragColor.r);
+      vec3 diffuseSmoke = (-1.0 * previousSmoke.xyz +
+       ((leftSmoke.xyz + rightSmoke.xyz + downSmoke.xyz + upSmoke.xyz))) / (4.0);
+
+      // TODO: Have operations for all three channels
+
+      gl_FragColor.rgb = diffuseSmoke;
+     }
+  </script>
+
+
+  <script id="advectShader" type="shader-code">
+    uniform vec2 res; // Screen resolution
+    uniform sampler2D textureAdvec;
+    uniform sampler2D textureVel;
+
+    void main() {
+      float FPS_FACTOR = 1.0 / 60.0;
+
+      vec2 pixel = gl_FragCoord.xy / res.xy;
+
+      // Pixel-values not float from 0-1
+      // float realX = gl_FragCoord.xy.x;
+      // float realY = gl_FragCoord.xy.y;
+
+			// TODO: Implement Advection for a single Velocity field.
+      // float dX = sin(2.0 * 3.14156 * realX); // 0 Divergence
+      float dX = texture2D(textureVel, pixel).x;
+      float prevX = pixel.x - FPS_FACTOR * dX;
+
+      // float dY = sin(2.0 * 3.14156 * realY); // 0 Divergence
+      float dY = texture2D(textureVel, pixel).y;
+      float prevY = pixel.y - FPS_FACTOR * dY;
+
+
+      vec4 prevSmoke = texture2D(textureAdvec, vec2(prevX, prevY));
+      gl_FragColor.xyz = prevSmoke.xyz;
+
+
+     }
+  </script>
+
+  <script id="velInitShader" type="shader-code">
+    void main() {
+      gl_FragColor.xyz = vec3(1.0, -1.0, 0);
+     }
+  </script>
+
+  <script>
+    // Initialize three.js scene, camera and renderer
+    var camera;
+    var renderer;
+
+    // Set up a vanilla scene
+    finalScene = new THREE.Scene();
+
+    var width = window.innerWidth;
+    var height = window.innerHeight;
+
+    camera = new THREE.OrthographicCamera(-width/2, width/2, height/2, -height/2, 1, 1000);
+    camera.position.z = 2; // Put camera in front of everything
+
+    renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    ////////////////// DENSITY / SCREEN BUFFERS /////////////////////////
+
+    // Plane holding all of the graphics
+    var canvas;
+
+    // Buffer variables: Source
+    var textureSource;
+    var bufferMaterialSource;
+    var bufferObjectSource;
+    var bufferSceneSource;
+
+
+    // Buffer variables: Source and Diffusion
+    var textureDiff;
+    var textureDiffO;
+    var bufferMaterialDiff;
+    var bufferObjectDiff;
+    var bufferSceneDiff;
+
+    // Second buffer: Advection (textureAdvec can be either density of velocity field)
+    var textureAdvec;
+    var textureVel;
+    var bufferMaterialAdvec;
+    var bufferObjectAdvec;
+    var bufferSceneAdvec;
+
+    // Divergence Buffer
+    var textureV;
+    var bufferMaterialDiv;
+    var bufferObjectDiv;
+    var bufferSceneDiv;
+
+    // Pressure Buffer
+    var textureDiv;
+    var texturePres;
+    var bufferMaterialPres;
+    var bufferObjectPres;
+    var bufferScenePres;
+
+    // Gradient Buffer
+    var textureGrad;
+    var bufferMaterialGrad;
+    var bufferObjectGrad;
+    var bufferSceneGrad;
+
+    // Actual, displayed scene variables
+    var textureFinal;
+    var finalMaterial;
+    var finalObject;
+    var finalScene;
+
+    // Intermediate Textures
+    var texturePresI;
+    var textureDensI;
+    var textureDiffI;
+
+    // TODO: Change advention shader to take x and y velocity
+    // three new shaders: divergence, pressure, gradient
+    //    - all take 2 input textures
+
+    // Initializing velocity field
+    var bufferMaterialVel;
+    var bufferObjectVel;
+    var bufferSceneVel;
+
+
+
+
+
+    function buffer_texture_setup(){
+      canvas = new THREE.PlaneBufferGeometry(window.innerWidth, window.innerHeight);
+
+
+      textureSource = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
+      // Create 2 buffer textures which will eventually hold our buffer scene, taking turns
+      // TextureFinal is always the one that's on the scene
+      // TextureDiff is always the one that's in the bufferMaterial/Scene
+      textureDiff = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
+      textureDiffO = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
+      textureDiffI = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter});
+      textureAdvec = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+
+      textureFinal = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+
+      textureVel = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, type: THREE.FloatType } );
+
+      textureV = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+
+      textureDiv = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      texturePres = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      texturePresI = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      textureGrad = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      textureDensI = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      //// SOURCE ////
+
+      bufferSceneSource = new THREE.Scene();
+      bufferMaterialSource = new THREE.ShaderMaterial( {
+        uniforms: {
+         textureSource: {
+           type: "t", value: textureSource
+         },
+         res: { // Screen resolution
+           type: 'v2',
+           value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+         },
+         smokeSource: { // Represents coordinates / radius / power of an ongoing smoke source
+           type: 'v3',
+           value: new THREE.Vector3(0,0,0)
+         },
+         radius: { // Refer to this for types: https://gamedevelopment.tutsplus.com/tutorials/a-beginners-guide-to-coding-graphics-shaders-part-2--cms-24111
+          type: 'f',
+          value: 12.0
+        },
+        },
+        fragmentShader: document.getElementById('sourceShader').innerHTML
+      } );
+      bufferObjectSource = new THREE.Mesh(canvas, bufferMaterialSource); // create object containing Shader info / screen
+      bufferSceneSource.add(bufferObjectSource); // add this info to buffer scene
+
+      //////// DIFFUSION ////////
+
+      // Create buffer scene, which will hold the shader material (bufferMaterial)
+      bufferSceneDiff = new THREE.Scene();
+      // Contains the shader and defines uniforms, first passing textureDiff through
+      bufferMaterialDiff = new THREE.ShaderMaterial( {
+        uniforms: {
+         textureDiff: {
+           type: "t", value: textureDiff
+         },
+         textureDiffO: {
+            type: "t", value: textureDiffO
+         },
+         res: { // Screen resolution
+           type: 'v2',
+           value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+         },
+         smokeSource: { // Represents coordinates / radius / power of an ongoing smoke source
+           type: 'v3',
+           value: new THREE.Vector3(0,0,0)
+         },
+         radius: { // Refer to this for types: https://gamedevelopment.tutsplus.com/tutorials/a-beginners-guide-to-coding-graphics-shaders-part-2--cms-24111
+          type: 'f',
+          value: 12.0
+        },
+        sourceRedWeight: { // Randomized: how much we want to "weight" red in the smoke source for a semi-randominzed color
+          type: 'f',
+          value: 1.0
+        }
+        },
+        fragmentShader: document.getElementById('diffuseShader').innerHTML
+      } );
+      bufferObjectDiff = new THREE.Mesh(canvas, bufferMaterialDiff); // create object containing Shader info / screen
+      bufferSceneDiff.add(bufferObjectDiff); // add this info to buffer scene
+
+
+
+      // //////// ADVECTION ////////
+      //
+      // Create buffer scene, which will hold the shader material (bufferMaterial)
+      bufferSceneAdvec = new THREE.Scene();
+      // Contains the shader and defines uniforms, first passing textureA through
+      bufferMaterialAdvec = new THREE.ShaderMaterial( {
+        uniforms: {
+         textureAdvec: {
+           type: "t", value: textureAdvec
+         },
+         textureVel: {
+          type: "t", value: textureVel
+         },
+         res: { // Screen resolution
+           type: 'v2',
+           value: new THREE.Vector2(window.innerWidth, window.innerHeight)
+         }
+       },
+      fragmentShader: document.getElementById('advectShader').innerHTML
+      } );
+      bufferObjectAdvec = new THREE.Mesh(canvas, bufferMaterialAdvec); // create object containing Shader info / screen
+      bufferSceneAdvec.add(bufferObjectAdvec); // add this info to buffer scene
+
+
+      /////// TODO: TEMPORARY CODE ///////
+      // Do the same thing for the actual scene/material/object: definitions are parallel to the buffer ones
+      // Draw textureB to material --> mesh --> actual scene
+      finalMaterial =  new THREE.MeshBasicMaterial({map: textureFinal}); // Contains TextureB
+      finalObject = new THREE.Mesh(canvas, finalMaterial); // Contains the general plane (the entire screen) and textureB
+      finalScene.add(finalObject); // Add to real (non-buffered) scene
+
+
+      // INITIALIZING VELOCITY FIELD
+      bufferSceneVel = new THREE.Scene();
+      bufferMaterialVel = new THREE.ShaderMaterial( {
+        uniforms: {},
+        fragmentShader: document.getElementById('velInitShader').innerHTML
+      } );
+      bufferObjectVel = new THREE.Mesh(canvas, bufferMaterialVel); // create object containing Shader info / screen
+      bufferSceneVel.add(bufferObjectVel); // add this info to buffer scene
+      renderer.render(bufferSceneVel, camera, textureVel, true);
+
+    }
+    buffer_texture_setup();
+
+
+    function generateSmokeAt(x, y, z, radius) {
+      bufferMaterialSource.uniforms.smokeSource.value.x = x;
+      bufferMaterialSource.uniforms.smokeSource.value.y = window.innerHeight - y;
+      bufferMaterialSource.uniforms.smokeSource.value.z = z;
+
+      bufferMaterialSource.uniforms.radius.value = radius;
+
+    }
+
+    var BETWEEN_SMOKE_TIME = 500; // 500 ms before each puff of smoke is generated
+    var GEN_SMOKE_TIME = 100; // Generate smoke from a source for 100 ms
+    function resumeSmoke() {
+      // console.log("Resuming smoke...")
+
+      width = window.innerWidth
+      height = window.innerHeight
+
+      var random_x = (Math.random() - 0.5) * (height / 3);
+      var random_y = (Math.random() - 0.5) * (height / 2); // From 2nd->3rd quarter
+      var radius = (Math.random()*4 + 1.0) * 10; // Varies from 10->50
+
+
+      generateSmokeAt(width / 2 + random_x, height / 2 + random_y, 0.1, radius);
+
+      // if (!requestStop) {
+      setTimeout(pauseSmoke, GEN_SMOKE_TIME);
+      // }
+    }
+    function pauseSmoke() {
+      // console.log("Pausing smoke...")
+      bufferMaterialSource.uniforms.smokeSource.value.z = 0;
+      setTimeout(resumeSmoke, BETWEEN_SMOKE_TIME);
+    }
+    resumeSmoke()
+
+    function render() {
+      requestAnimationFrame(render); // Set this function as the callback for the future
+
+      // Steps according to https://gamedevelopment.tutsplus.com/tutorials/quick-tip-how-to-render-to-a-texture-in-threejs--cms-25686
+        // 1. Create a scene to hold your objects.
+        // 2. Create a texture to store what you render
+        // 3. Render your scene onto your texture
+
+      // // VELOCITY STEP
+      //
+      // // Set Diffusion Buffer input to velocity texture.
+      // textureDiff = textureVel;
+      // bufferMaterialDiff.uniforms.textureDiff.value = textureDiff;
+      //
+      // // Set Diffusion Buffer baseline to its initial input.
+      // textureDiffO = textureDiff;
+      // bufferMaterialDiff.uniforms.textureDiffO.value = textureDiffO;
+      //
+      // // Run the Diffusion Buffer on itself 20 times.
+      // var i;
+      // for (i = 0; i < 20; i++) {
+      //   renderer.render(bufferSceneDiff, camera, textureDiffI, true);
+      //   textureDiff = textureDiffI;
+     	// 	bufferMaterialDiff.uniforms.textureDiff.value = textureDiff;
+      // }
+      //
+      // // Set Divergence Buffer input to Diffusion Buffer output.
+      // textureV = textureDiff
+      //
+      // // Generate divergence texture from velocity texture.
+      // renderer.render(bufferSceneDiv, camera, textureDiv, true);
+      //
+      // // Initialize texturePres to 0 at all points.
+      // texturePres = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      //
+      // // Run the Pressure Buffer on itself 20 times.
+      // for (i = 0; i < 20; i++) {
+      //   // Run the Pressure Buffer into the intermediate pressure texture.
+      //   renderer.render(bufferScenePres, camera, texturePresI, true);
+      //   // Set the pressure texture to the intermediate texture.
+      //   texturePres = texturePresI;
+      // }
+      //
+      // // Set Gradient Buffer input to the velocity texture.
+      // textureGrad = textureV;
+      //
+      // // Generate the mass-consistent velocity texture.
+      // renderer.render(bufferSceneGrad, camera, textureVel, true);
+      //
+      // // Set Advection Buffer input to velocity texture.
+      // textureAdvec = textureVel
+      //
+      // // Generate the advected velocity texture.
+      // renderer.render(bufferSceneAdvec, camera, textureV, true);
+      //
+      // // Perform the mass-conserving steps again.
+      //
+      // // Generate divergence texture from velocity texture.
+      // renderer.render(bufferSceneDiv, camera, textureDiv, true);
+      //
+      // // Initialize texturePres to 0 at all points.
+      // texturePres = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+      //
+      // // Run the Pressure Buffer on itself 20 times.
+      // for (i = 0; i < 20; i++) {
+      //   // Run the Pressure Buffer into the intermediate pressure texture.
+      //   renderer.render(bufferScenePres, camera, texturePresI, true);
+      //   // Set the pressure texture to the intermediate texture.
+      //   texturePres = texturePresI;
+      // }
+      //
+      // // Set Gradient Buffer input to the velocity texture.
+      // textureGrad = textureV;
+      //
+      // // Generate the mass-consistent velocity texture.
+      // renderer.render(bufferSceneGrad, camera, textureVel, true);
+
+      // DENSITY STEP
+
+       // TODO: Finish rendering pipeline, finish renaming values,
+       // add three additional buffers, implement three new shaders.
+
+       // Assume that textureA thru the shader (thru bufferMaterial)
+       // Now, move bufferscene objects (result of passing A through shader) --> textureB
+      // Set Diffusion Buffer input to Density Buffer.
+      // textureDiff = textureDensI;
+      // bufferMaterialDiff.uniforms.textureDiff.value = textureDiff;
+
+
+
+      // DENSITY SOURCE
+
+      renderer.render(bufferSceneSource, camera, textureDiff, true)
+
+      // DENSITY DIFFUSION
+
+      textureDiffO = textureDiff.clone();
+      bufferMaterialDiff.uniforms.textureDiffO.value = textureDiffO;
+
+      var i;
+      for (i = 0; i < 20; i++) {
+        renderer.render(bufferSceneDiff, camera, textureDiffI, true);
+        var swap = textureDiff;
+        textureDiff = textureDiffI;
+        textureDiffI = swap;
+        // textureDiffI = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter} );
+
+        bufferMaterialDiff.uniforms.textureDiff.value = textureDiff;
+      }
+
+      renderer.render(bufferSceneDiff, camera, textureAdvec, true);
+
+      // DENSITY ADVECTION
+
+      renderer.render(bufferSceneAdvec, camera, textureFinal, true);
+
+
+      // FINAL
+
+      // This line applies to any WebGL project; draw to screen
+      // Render texture C to the scene (through finalObject since we just swapped it)
+
+      renderer.render(finalScene, camera);
+
+      // textureDensI = textureFinal;
+      // finalObject.material.map = textureFinal; // "finalObject" is an object that has been added to the scene
+
+
+      // oops
+
+      var swap = textureSource;
+      textureSource = textureFinal;
+      textureFinal = swap;
+      bufferMaterialSource.uniforms.textureSource.value = textureSource; // Swap the buffer's texture to textureA
+      finalObject.material.map = textureFinal; // "finalObject" is an object that has been added to the scene
+    }
+    render();
+  </script>
+</body>
+</html>
