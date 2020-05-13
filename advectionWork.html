@@ -131,7 +131,7 @@
       vec2 pixel = gl_FragCoord.xy / res.xy;
       float xVel = sin(2.0 * 3.14159 * pixel.x);
       float yVel = sin(2.0 * 3.14159 * pixel.y);
-      gl_FragColor.xyz = vec3(yVel, xVel, 0);
+      gl_FragColor.xyz = vec3(0, 1, 0);
      }
   </script>
 
@@ -284,9 +284,6 @@
     var bufferMaterialVel;
     var bufferObjectVel;
     var bufferSceneVel;
-
-
-
 
 
     function buffer_texture_setup(){
