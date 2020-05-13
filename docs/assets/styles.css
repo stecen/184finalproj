@@ -72,3 +72,20 @@
 	width: 600px;
 	height: 400px;
 }
+
+#upload{
+	width: 200px;
+	height: 30px;
+	padding-top: 10px;
+	text-align: center;
+	background-color: white;
+}
+
+#thefile {
+	width: 0.1px;
+	height: 0.1px;
+	opacity: 0;
+	overflow: hidden;
+	position: absolute;
+	z-index: -1;
+}
