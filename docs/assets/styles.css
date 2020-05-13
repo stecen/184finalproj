@@ -1,0 +1,74 @@
+.section {
+	height: 100vh;
+	width: 100vw;
+	z-index: 0;
+	position: relative;
+	background-size: fill;
+}
+
+#content{
+	width: 600px;
+	height: 100vh;
+	background-size: 40px 40px;
+  	background-image:
+    linear-gradient(to right, #450eff 1px, transparent 1px),
+    linear-gradient(to bottom, #450eff 1px, transparent 1px);
+    border-right: 1px #450eff solid;
+}
+
+#sec1{
+	background-color: #21006f;
+	font-family: 'Share Tech Mono', monospace;	
+	display: flex;
+}
+
+#page1{
+	width: 100%;
+	height: 100%;
+	display: flex;
+	flex-direction: row;
+}
+
+#text{
+	flex-grow: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+#title{
+	font-size: 5vh;
+	color: #fe3218;
+	margin-top: 50px;
+
+}
+
+#names{
+	margin: 30px;
+	font-size: 2.5vh;
+	color: #ff911a;
+}
+
+.header1{
+	color: #e100f5;
+	font-size: 4vh;
+}
+
+.abstracttext{
+	color: white;
+	font-size: 2.3vh;
+	width: 600px;
+	margin-top: 20px;
+}
+
+#content{
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: space-between;
+}
+
+#myCanvas{
+	width: 600px;
+	height: 400px;
+}
