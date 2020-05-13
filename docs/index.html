@@ -6,7 +6,7 @@
 	<link rel="stylesheet" href = "assets/jquery.fullPage.css"/>
 	<script src = "assets/scripts.js"></script>
 	<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
-
+	<link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
 	</head>
 
 	<body>
@@ -370,17 +370,51 @@ file.onchange = function() {
 						<div id='title'> Fluid Dynamic Music Visualizer</div>
 						<div id='names'>Steven Cen, Haoran Guo, Philip Green</div>
 						<div class='header1'>Abstract</div>
-						<div class='abstracttext'>Our project aims to create a realistic looking 2D simulation of smoke that visualizes an audio input. This class was all about how computers recreate things in the visual sense, so we wanted to extend this theme into the auditory sense and incorporate music, which led us to the goal of visualizing music through tweaking parameters of a smoke simulator. We used TWGL.js and the Web Audio API to implement our simulation shaders and render them onto a browser window, using numerical approximations to solve systems of equations involving smoke density, velocity, and pressure. These numerical methods involve Jacobi iterations as well as projections of velocity fields into irrotational and solenoidal counterparts to maintain mass conversation. To integrate our simulation with audio input, we take in an audio file and process it with a fourier transform to obtain the strength of the frequencies that make up the audio. Using this information, we tweak parameters and inject mass and velocities to our simulation. Doing this with the Web Audio API allows for us to sync the simulation with the music, creating an interesting audio and visual experience. <br><br> To run the simulation simply upload any audio file on the left. Click in the simulation to inject velocity.</div>	
+						<div class='abstracttext'>Our project aims to create a realistic looking 2D simulation of smoke that visualizes an audio input. This class was all about how computers recreate things in the visual sense, so we wanted to extend this theme into the auditory sense and incorporate music, which led us to the goal of visualizing music through tweaking parameters of a smoke simulator. We used TWGL.js and the Web Audio API to implement our simulation shaders and render them onto a browser window, using numerical approximations to solve systems of equations involving smoke density, velocity, and pressure. These numerical methods involve Jacobi iterations as well as projections of velocity fields into irrotational and solenoidal counterparts to maintain mass conversation. To integrate our simulation with audio input, we take in an audio file and process it with a fourier transform to obtain the strength of the frequencies that make up the audio. Using this information, we tweak parameters and inject mass and velocities to our simulation. Doing this with the Web Audio API allows for us to sync the simulation with the music, creating an interesting audio and visual experience. <br><br> To run the simulation simply upload any audio file on the left. Click in the simulation to inject velocity. <br><br> V see more about the about below V</div>	
 					</div>
 				</div>
 			</div> 
 	 
 			<div id="sec2" class="section">
+				<div class='col'>
+					<div class='heading'> Technical Approach</div>
+					<div class='maintext'>One of the foundational aspects of our fluid dynamics system involves solving many large linear systems that are infeasible for us to calculate directly. Instead, we numerically approximate these equations. The main equation for us to consider is the Navier-Stokes equations which model the motion of viscous fluids:
+					</div>
+					<img class='img1' src = 'assets/img1.png'/>
+					<div class = 'maintext'>From Stam’s paper, Real-Time Fluid Dynamics for Games, we implemented approximate calculations for these equations for a real-time smoke simulation. In fact, the second equation is stated to allow for another approximation to achieve greater speed. Rather than model many particles, the paper suggests a density field which translates into colors that represent the presence of smoke. 
+The main movements of the smoke densities are from diffusion and advection. Diffusion involves density from one cell to diffuse into its neighbors, while its neighbors also diffuse density into that cell. A simple implementation can result in diverging values, so a stable one that we used from the paper is to find values accurately line up with the previous time steps densities had we reversed the diffusion by a time step: 
+</div>
+				<img class='img2' src = 'assets/img2.png'/>
 
+				<div class = 'maintext'>
+					To solve for the x values of the next time step Gauss-Seidel relaxation is used. This is a simpler method than matrix inversion for solving our linear system, which is sparse since there are many cells with no smoke density, and thus are zero-valued. <br><br>
+We then used the Projection Method, using the principles of the Helmholtz decomposition, whereby any vector field can be represented as the sum of a solenoidal and irrotational vector field. By calculating pressure at all pixels, we were able to generate the irrotational field, and using that could easily find the mass-conserving vector field. <br><br>
+We encountered many problems with the Three.js and WebGL as we grappled with learning how to use the frameworks. We also learned the harsh truth about debugging with WebGL, namely that there is no way to debug, other than changing one line at a time and seeing if the output still holds up.
+
+				</div>
+					
+
+				</div>
+				<div class='col'>
+					
+				</div>
 			</div>
 
 			<div id="sec3" class="section">
-					
+				<div class='col'>
+					<div class = 'heading'> Results</div>
+					<div class = 'maintext'> Please try the simulation on the first page!</div>
+					<div class = 'heading'> References</div>
+					<div class = 'maintext'> Stam, J., n.d. Real-Time Fluid Dynamics For Games. [ebook] Available at: &lt;https://pdfs.semanticscholar.org/847f/819a4ea14bd789aca8bc88e85e906cfc657c.pdf&gt; [Accessed 13 May 2020].</div>
+					<div class = 'heading'> Contributions from each team member </div>
+					<div class = 'maintext'>Philip Green: <br>
+					Primary coding for the TinyGL implementation of the project, as well as general pipeline planning and music processing.<br>
+					Haoran Guo:<br>
+					Worked on the WebGL implementation, writing some of the shaders and rendering pipeline. Created the websites for the project deliverables<br>
+					Steven Cen:
+					Steven conceptualized the general idea of the project, worked on a lot of the WebGL implementation. Debugged and tweaked the final visualization.
+</div>
+				</div>
 				
 			</div>		
 		</div>
